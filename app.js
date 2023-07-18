@@ -1,5 +1,6 @@
 const express = require("express");
 const axios = require("axios");
+const qs = require("qs");
 
 require("dotenv").config();
 
@@ -12,30 +13,66 @@ const {
   DAILYMOTION_API_BASE_URL,
   DAILYMOTION_API_OAUTH_TOKEN_URL,
   DAILYMOTION_API_VIDEO_URL,
+  LIVE_98_ID,
 } = process.env;
 
 async function getAccessToken() {
-  const data = {
-    scope: "read_video_streams",
-    grant_type: "client_credentials",
-    client_id: DAILYMOTION_CLIENT_ID,
-    client_secret: DAILYMOTION_CLIENT_SECRET,
-  };
-  console.log(data);
+  try {
+    const data = qs.stringify({
+      scope: "read_video_streams",
+      grant_type: "client_credentials",
+      client_id: DAILYMOTION_CLIENT_ID,
+      client_secret: DAILYMOTION_CLIENT_SECRET,
+    });
 
-  const response = await axios({
-    url: `${DAILYMOTION_API_BASE_URL}/${DAILYMOTION_API_OAUTH_TOKEN_URL}`,
-    method: "post",
-    data,
-  });
+    const response = await axios.request({
+      method: "post",
+      maxBodyLength: Infinity,
+      url: `${DAILYMOTION_API_BASE_URL}/${DAILYMOTION_API_OAUTH_TOKEN_URL}`,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      data: data,
+    });
+    return { response, error: false };
+  } catch (error) {
+    return { error: true, message: error.toString() };
+  }
+}
 
-  return response;
+async function getStrealURLs() {
+  const { response, error } = await getAccessToken();
+
+  if (!error) {
+    const { access_token } = response.data;
+    try {
+      const response = await axios.request({
+        method: "get",
+        url: `${DAILYMOTION_API_BASE_URL}/${DAILYMOTION_API_VIDEO_URL}/${LIVE_98_ID}`,
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+        params: {
+          fields: "stream_live_hls_url",
+        },
+      });
+      return { response, error: false };
+    } catch (error) {
+      return { error: true, message: error.toString() };
+    }
+  }
+
+  return { error: true, message: error.toString() };
 }
 
 app.get("/", async (req, res) => {
   try {
-    const token = await getAccessToken();
-    res.status(200).json({ token });
+    const { response, error } = await getStrealURLs();
+    if (!error) {
+      const { data } = response;
+      return res.status(200).json({ data });
+    }
+    return res.status(502).json({ error });
   } catch (error) {
     res.status(502).send(error);
   }
