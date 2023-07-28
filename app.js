@@ -1,6 +1,8 @@
 const express = require("express");
 const axios = require("axios");
 const qs = require("qs");
+const requestIP = require("request-ip");
+const IP = require("ip");
 
 require("dotenv").config();
 
@@ -40,7 +42,7 @@ async function getAccessToken() {
   }
 }
 
-async function getStrealURLs() {
+async function getStrealURLs(ip) {
   const { response, error } = await getAccessToken();
 
   if (!error) {
@@ -54,6 +56,7 @@ async function getStrealURLs() {
         },
         params: {
           fields: "stream_live_hls_url",
+          // client_ip: ip,
         },
       });
       return { response, error: false };
@@ -67,7 +70,10 @@ async function getStrealURLs() {
 
 app.get("/", async (req, res) => {
   try {
-    const { response, error } = await getStrealURLs();
+    const ipAddress1 = requestIP.getClientIp(req);
+    const ipAddress2 = IP.address();
+    console.log(ipAddress1, ipAddress2);
+    const { response, error } = await getStrealURLs("186.194.175.216");
     if (!error) {
       const { data } = response;
       return res.status(200).json({ data });
